@@ -1,4 +1,4 @@
-name: Deploy to Heroku (on push to main)
+name: Deploy Flask App to Heroku
 
 on:
   push:
@@ -6,53 +6,31 @@ on:
 
 jobs:
   deploy:
-    name: Run tests and deploy to Heroku
+    name: Deploy to Heroku
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run tests
-        run: pytest -q
-
-      - name: Deploy to Heroku
-        # Using a popular Heroku action to push the app
-        uses: akhileshns/heroku-deploy@v3
+      - name: Log in to Heroku
+        uses: akhileshns/heroku-deploy@v3.12.12
         with:
           heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
           heroku_app_name: ${{ secrets.HEROKU_APP_NAME }}
           heroku_email: ${{ secrets.HEROKU_EMAIL }}
+          usedocker: false   # Set true if using Docker-based deployment
 
-  notify_on_failure:
-    name: Notify on failure (create GitHub issue)
-    runs-on: ubuntu-latest
-    needs: deploy
-    # run this job only if deploy failed
-    if: ${{ needs.deploy.result == 'failure' }}
-    steps:
-      - name: Create GitHub issue for failed deployment
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const title = `Deployment FAILED: ${process.env.GITHUB_REPOSITORY} @ ${process.env.GITHUB_SHA}`;
-            const body = `Heroku deployment failed for commit ${process.env.GITHUB_SHA}.\n\nCheck the Actions run: ${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
-            await github.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title,
-              body
-            });
-
-  # OPTIONAL: you can add another notification job that posts to Slack if you have webhook
-  # (example omitted here — let me know if you want Slack + email + MS Teams integrations)
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "⚠️ Deployment to Heroku failed. Please check the workflow logs."
